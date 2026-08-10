@@ -30,15 +30,23 @@
   function saveProgress(p) {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(p)); } catch (e) {}
   }
-  var progress = loadProgress(); // { [num]: {seen:int, correctStreak:int, lastCorrect:bool} }
+  var progress = loadProgress(); // { [num]: {seen:int, correctStreak:int, lastCorrect:bool, flagged:bool} }
 
   function recordAnswer(num, correct) {
-    var e = progress[num] || { seen: 0, correctStreak: 0, lastCorrect: null };
+    var e = progress[num] || { seen: 0, correctStreak: 0, lastCorrect: null, flagged: false };
     e.seen += 1;
     e.lastCorrect = correct;
     e.correctStreak = correct ? (e.correctStreak + 1) : 0;
     progress[num] = e;
     saveProgress(progress);
+  }
+
+  function toggleFlag(num) {
+    var e = progress[num] || { seen: 0, correctStreak: 0, lastCorrect: null, flagged: false };
+    e.flagged = !e.flagged;
+    progress[num] = e;
+    saveProgress(progress);
+    return e.flagged;
   }
 
   function isPassed(num) {
@@ -59,17 +67,22 @@
     var e = progress[num];
     return !!(e && e.correctStreak >= 3);
   }
+  function isFlagged(num) {
+    var e = progress[num];
+    return !!(e && e.flagged);
+  }
 
   function topicStats(topicKey) {
     var list = topicKey === '__ALL__' ? QUESTIONS : byTopic[topicKey];
-    var passed = 0, missed = 0, seen = 0, mastered = 0;
+    var passed = 0, missed = 0, seen = 0, mastered = 0, flagged = 0;
     list.forEach(function (q) {
       if (isSeen(q.num)) seen++;
       if (isPassed(q.num)) passed++;
       else if (isMissed(q.num)) missed++;
       if (isMastered(q.num)) mastered++;
+      if (isFlagged(q.num)) flagged++;
     });
-    return { total: list.length, passed: passed, missed: missed, seen: seen, mastered: mastered };
+    return { total: list.length, passed: passed, missed: missed, seen: seen, mastered: mastered, flagged: flagged };
   }
 
   // ---------------- Rendering ----------------
@@ -111,6 +124,8 @@
       if (session) { renderQuestion(); } else { renderMenu(); }
     } else if (state.screen === 'results') {
       if (session) { renderResults(); } else { renderMenu(); }
+    } else if (state.screen === 'stats') {
+      renderStats();
     } else {
       renderMenu();
     }
@@ -129,6 +144,8 @@
       '<div class="overall-row overall-sub"><span>З них правильно</span><span class="overall-num good">' + overall.passed + '</span></div>' +
     '</div>';
 
+    html += '<button class="btn btn-ghost btn-stats" id="statsBtn" type="button">📊 Детальна статистика</button>';
+
     html += '<div class="intro">Обери тему нижче — тест буде складатись лише з її питань. Прогрес зберігається на цьому пристрої, тож можна вчити частинами.</div>';
 
     html += '<div class="topic-grid">';
@@ -146,13 +163,16 @@
     }
     html += '<footer>Дані взято з оригінального PDF · відповіді визначені за виділенням у джерелі</footer>';
 
-    app.innerHTML = html;
+    app.innerHTML = '<div class="screen">' + html + '</div>';
 
     document.querySelectorAll('.topic-card').forEach(function (el) {
       el.addEventListener('click', function () {
         var key = el.getAttribute('data-key');
         goTo({ screen: 'mode', topicKey: key }, function () { openModePicker(key); });
       });
+    });
+    document.getElementById('statsBtn').addEventListener('click', function () {
+      goTo({ screen: 'stats' }, renderStats);
     });
   }
 
@@ -164,6 +184,7 @@
     metaBits.push('<span class="' + pillCls + '">' + stats.seen + '/' + stats.total + ' пройдено</span>');
     metaBits.push('<span class="' + masteredPillCls + '">' + stats.mastered + '/' + stats.total + ' засвоєно</span>');
     if (stats.missed > 0) metaBits.push('<span class="miss-count">' + stats.missed + ' зі помилками</span>');
+    if (stats.flagged > 0) metaBits.push('<span class="flag-count">🔖 ' + stats.flagged + '</span>');
     return '' +
       '<div class="' + cls + '" data-key="' + esc(key) + '">' +
         '<div class="topic-main">' +
@@ -177,7 +198,9 @@
   function openModePicker(topicKey) {
     var label = topicKey === '__ALL__' ? 'Усі теми підряд' : topicKey;
     var list = topicKey === '__ALL__' ? QUESTIONS : byTopic[topicKey];
+    var unseenList = list.filter(function (q) { return !isSeen(q.num); });
     var missedList = list.filter(function (q) { return isMissed(q.num); });
+    var flaggedList = list.filter(function (q) { return isFlagged(q.num); });
     var stats = topicStats(topicKey);
 
     var html = '';
@@ -190,18 +213,27 @@
       '<div class="progress-track"><div class="progress-fill mastered-fill" style="width:' + (stats.total ? Math.round(stats.mastered / stats.total * 100) : 0) + '%"></div></div>' +
     '</div>';
     html += '<div class="topic-grid">';
-    html += modeCardHTML('all', 'Пройти всю тему', list.length + ' питань, у випадковому порядку');
+    if (unseenList.length > 0) {
+      html += modeCardHTML('new', 'Нові питання', unseenList.length + ' питань, які ще не траплялись');
+    }
     if (missedList.length > 0) {
       html += modeCardHTML('missed', 'Тільки помилки', missedList.length + ' питань, де минулого разу була помилка');
     }
+    if (flaggedList.length > 0) {
+      html += modeCardHTML('flagged', '🔖 На повторення', flaggedList.length + ' питань, позначених вручну');
+    }
+    html += modeCardHTML('all', 'Пройти всю тему', list.length + ' питань, у випадковому порядку (з повторами)');
     html += '</div>';
-    app.innerHTML = html;
+    app.innerHTML = '<div class="screen">' + html + '</div>';
 
     document.getElementById('backBtn').addEventListener('click', function () { history.back(); });
     document.querySelectorAll('.topic-card').forEach(function (el) {
       el.addEventListener('click', function () {
         var mode = el.getAttribute('data-mode');
-        var pool = mode === 'missed' ? missedList : list;
+        var pool = list;
+        if (mode === 'missed') pool = missedList;
+        else if (mode === 'new') pool = unseenList;
+        else if (mode === 'flagged') pool = flaggedList;
         goTo({ screen: 'quiz', topicKey: topicKey, label: label }, function () { startSession(pool, label); });
       });
     });
@@ -270,19 +302,31 @@
     html += '</div>';
     html += '<div class="feedback" id="feedback"></div>';
     html += '<div id="explWrap"></div>';
+    html += '<div class="qcard-actions">';
     html += '<button class="btn btn-ghost btn-expl" id="explBtn" type="button">Чому це правильно? 💡</button>';
+    html += '<button class="btn btn-ghost btn-flag' + (isFlagged(q.num) ? ' active' : '') + '" id="flagBtn" type="button">' + (isFlagged(q.num) ? '✅ У списку повторення' : '🔖 Повторити пізніше') + '</button>';
+    html += '</div>';
     html += '</div>';
 
     html += '<div class="nextbar"><button class="btn btn-primary" id="nextBtn" disabled>Далі →</button></div>';
 
-    app.innerHTML = html;
+    app.innerHTML = '<div class="screen">' + html + '</div>';
 
     document.getElementById('quitBtn').addEventListener('click', function () { history.back(); });
     document.querySelectorAll('#optsWrap .opt').forEach(function (btn) {
       btn.addEventListener('click', function () { onAnswer(parseInt(btn.getAttribute('data-pos'), 10)); });
     });
-    document.getElementById('nextBtn').addEventListener('click', onNext);
+    document.getElementById('nextBtn').addEventListener('click', function (e) {
+      e.currentTarget.disabled = true;
+      onNext();
+    });
     document.getElementById('explBtn').addEventListener('click', function () { toggleExplanation(q); });
+    document.getElementById('flagBtn').addEventListener('click', function () {
+      var flagged = toggleFlag(q.num);
+      var btn = document.getElementById('flagBtn');
+      btn.textContent = flagged ? '✅ У списку повторення' : '🔖 Повторити пізніше';
+      btn.classList.toggle('active', flagged);
+    });
   }
 
   function explanationHTML(q) {
@@ -383,22 +427,82 @@
       html += '</div>';
     }
 
-    app.innerHTML = html;
+    app.innerHTML = '<div class="screen">' + html + '</div>';
 
     var origList = session.list.slice();
     var missedPool = session.missedThisRun.slice();
     var label = session.topicLabel;
 
     document.getElementById('retryBtn').addEventListener('click', function () {
-      goTo({ screen: 'quiz', label: label }, function () { startSession(origList, label); });
+      // Replace (not push) so back from the new attempt goes to the mode
+      // picker, not to this now-stale results screen.
+      history.replaceState({ screen: 'quiz', label: label }, '');
+      startSession(origList, label);
     });
     var mb = document.getElementById('retryMissedBtn');
     if (mb) mb.addEventListener('click', function () {
-      goTo({ screen: 'quiz', label: label }, function () { startSession(missedPool, label); });
+      history.replaceState({ screen: 'quiz', label: label }, '');
+      startSession(missedPool, label);
     });
     document.getElementById('menuBtn').addEventListener('click', function () {
       goTo({ screen: 'menu' }, renderMenu);
     });
+  }
+
+  function renderStats() {
+    var overall = topicStats('__ALL__');
+    var overallPct = overall.total > 0 ? Math.round((overall.seen / overall.total) * 100) : 0;
+    var accuracyPct = overall.seen > 0 ? Math.round((overall.passed / overall.seen) * 100) : 0;
+
+    var html = '';
+    html += '<div class="plate"><div><h1>Статистика</h1><div class="sub">Прогрес по всіх темах</div></div></div>';
+    html += '<button class="homebtn" id="backBtn">← До списку тем</button>';
+
+    html += '<div class="overall-progress">' +
+      '<div class="overall-row"><span>Пройдено всього</span><span class="overall-num">' + overall.seen + ' / ' + overall.total + ' (' + overallPct + '%)</span></div>' +
+      '<div class="progress-track"><div class="progress-fill" style="width:' + overallPct + '%"></div></div>' +
+      '<div class="overall-row overall-sub"><span>Точність відповідей</span><span class="overall-num good">' + accuracyPct + '%</span></div>' +
+      '<div class="overall-row overall-sub"><span>Засвоєно (3× поспіль)</span><span class="overall-num mastered">' + overall.mastered + '</span></div>' +
+      '<div class="overall-row overall-sub"><span>Позначено на повторення</span><span class="overall-num">🔖 ' + overall.flagged + '</span></div>' +
+    '</div>';
+
+    var topicRows = TOPIC_ORDER.map(function (t) {
+      return { name: t, stats: topicStats(t) };
+    });
+
+    var weakest = topicRows.filter(function (r) { return r.stats.seen > 0; })
+      .slice()
+      .sort(function (a, b) {
+        var pa = a.stats.passed / a.stats.seen, pb = b.stats.passed / b.stats.seen;
+        return pa - pb;
+      })
+      .slice(0, 3);
+
+    if (weakest.length > 0) {
+      html += '<div class="intro">Теми, де варто підтягнути точність:</div>';
+      html += '<div class="topic-grid">';
+      weakest.forEach(function (r) {
+        var acc = Math.round((r.stats.passed / r.stats.seen) * 100);
+        html += '<div class="topic-card weak-topic"><div class="topic-main">' +
+          '<div class="topic-name">' + esc(r.name) + '</div>' +
+          '<div class="topic-meta">' + r.stats.passed + '/' + r.stats.seen + ' правильно з пройдених</div>' +
+          '</div><div class="topic-count">' + acc + '%</div></div>';
+      });
+      html += '</div>';
+    }
+
+    html += '<div class="intro">Деталі по кожній темі:</div>';
+    html += '<div class="stats-table-wrap"><table class="stats-table"><thead><tr>' +
+      '<th>Тема</th><th>Пройдено</th><th>Правильно</th><th>Засвоєно</th><th>🔖</th>' +
+      '</tr></thead><tbody>';
+    topicRows.forEach(function (r) {
+      var s = r.stats;
+      html += '<tr><td>' + esc(r.name) + '</td><td>' + s.seen + '/' + s.total + '</td><td>' + s.passed + '</td><td>' + s.mastered + '</td><td>' + (s.flagged || '') + '</td></tr>';
+    });
+    html += '</tbody></table></div>';
+
+    app.innerHTML = '<div class="screen">' + html + '</div>';
+    document.getElementById('backBtn').addEventListener('click', function () { history.back(); });
   }
 
   // ---------------- Bootstrap ----------------
