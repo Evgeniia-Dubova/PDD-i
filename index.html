@@ -7,14 +7,21 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="wrap" id="app"></div>
+<div class="wrap" id="app">
+  <div class="plate"><div><h1>ПДД Ірландії</h1><div class="sub">Завантаження…</div></div></div>
+</div>
 
+<!-- Question data, split into 6 files (data/chunk01.js .. chunk06.js).
+     Each one appends its slice to window.PDD_DATA. Order matters: they must
+     load before app.js, and in this numeric order. -->
 <script src="data/chunk01.js"></script>
 <script src="data/chunk02.js"></script>
 <script src="data/chunk03.js"></script>
 <script src="data/chunk04.js"></script>
 <script src="data/chunk05.js"></script>
 <script src="data/chunk06.js"></script>
+
 <script src="app.js"></script>
 </body>
 </html>
+
