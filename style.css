@@ -146,6 +146,7 @@
     background: var(--asphalt-3); color: var(--grey); white-space:nowrap;
   }
   .mastery-pill.has-progress{ background: var(--good-bg); color: var(--good); }
+  .mastered-pill.has-progress{ background: #f3e3ef; color: #8e3b7c; }
   .topic-count{
     font-family:'Courier New', monospace;
     font-weight:700;
