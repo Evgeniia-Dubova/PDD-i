@@ -1,7 +1,13 @@
 (function () {
   "use strict";
 
-  var RAW = window.QUIZ_DATA || [];
+  var RAW = window.PDD_DATA || [];
+  if (RAW.length === 0) {
+    document.getElementById('app').innerHTML =
+      '<div class="plate"><div><h1>Помилка завантаження</h1><div class="sub">Дані не знайдено</div></div></div>' +
+      '<div class="intro">window.PDD_DATA порожній. Перевір, що файли data/chunk01.js…chunk06.js підключені в index.html ПЕРЕД app.js, і що жоден з них не видалили чи не перейменували.</div>';
+    return;
+  }
   // Filter out questions with no marked correct answer or malformed option count (source PDF gaps)
   var QUESTIONS = RAW.filter(function (q) { return q.correct !== null && q.options && q.options.length >= 2; });
   var EXCLUDED = RAW.length - QUESTIONS.length;
@@ -117,13 +123,10 @@
 
     var overall = topicStats('__ALL__');
     var overallPct = overall.total > 0 ? Math.round((overall.seen / overall.total) * 100) : 0;
-    var overallMasteredPct = overall.total > 0 ? Math.round((overall.mastered / overall.total) * 100) : 0;
     html += '<div class="overall-progress">' +
       '<div class="overall-row"><span>Пройдено питань</span><span class="overall-num">' + overall.seen + ' / ' + overall.total + '</span></div>' +
       '<div class="progress-track"><div class="progress-fill" style="width:' + overallPct + '%"></div></div>' +
       '<div class="overall-row overall-sub"><span>З них правильно</span><span class="overall-num good">' + overall.passed + '</span></div>' +
-      '<div class="overall-row" style="margin-top:6px;"><span>Засвоєно (3× поспіль)</span><span class="overall-num mastered">' + overall.mastered + ' / ' + overall.total + '</span></div>' +
-      '<div class="progress-track"><div class="progress-fill mastered-fill" style="width:' + overallMasteredPct + '%"></div></div>' +
     '</div>';
 
     html += '<div class="intro">Обери тему нижче — тест буде складатись лише з її питань. Прогрес зберігається на цьому пристрої, тож можна вчити частинами.</div>';
@@ -156,8 +159,10 @@
   function topicCardHTML(key, label, stats) {
     var cls = 'topic-card' + (key === '__ALL__' ? ' all' : '');
     var pillCls = 'mastery-pill' + (stats.seen > 0 ? ' has-progress' : '');
+    var masteredPillCls = 'mastery-pill mastered-pill' + (stats.mastered > 0 ? ' has-progress' : '');
     var metaBits = [];
     metaBits.push('<span class="' + pillCls + '">' + stats.seen + '/' + stats.total + ' пройдено</span>');
+    metaBits.push('<span class="' + masteredPillCls + '">' + stats.mastered + '/' + stats.total + ' засвоєно</span>');
     if (stats.missed > 0) metaBits.push('<span class="miss-count">' + stats.missed + ' зі помилками</span>');
     return '' +
       '<div class="' + cls + '" data-key="' + esc(key) + '">' +
@@ -256,7 +261,7 @@
     html += '<div class="qnum">Питання № ' + q.num + '</div>';
     html += '<div class="qtext">' + esc(q.text) + '</div>';
     if (q.img) {
-      html += '<div class="qimg-wrap"><img src="' + q.img + '" alt="Зображення до питання"></div>';
+      html += '<div class="qimg-wrap"><img src="assets/img/' + q.img + '" alt="Зображення до питання"></div>';
     }
     html += '<div class="options" id="optsWrap">';
     view.order.forEach(function (origIdx, pos) {
