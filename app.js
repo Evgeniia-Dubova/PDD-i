@@ -165,6 +165,7 @@
 
     var allStats = topicStats('__ALL__');
     html += topicCardHTML('__ALL__', 'Усі теми підряд', allStats);
+    html += randomCardHTML();
 
     TOPIC_ORDER.slice().sort(function (a, b) { return byTopic[b].length - byTopic[a].length; }).forEach(function (t) {
       html += topicCardHTML(t, t, topicStats(t));
@@ -181,12 +182,32 @@
     document.querySelectorAll('.topic-card').forEach(function (el) {
       el.addEventListener('click', function () {
         var key = el.getAttribute('data-key');
+        if (key === RANDOM_KEY) {
+          var pool = shuffle(QUESTIONS).slice(0, Math.min(RANDOM_COUNT, QUESTIONS.length));
+          var label = 'Змішаний тест (' + pool.length + ' питань)';
+          goTo({ screen: 'quiz', topicKey: key, label: label }, function () { startSession(pool, label); });
+          return;
+        }
         goTo({ screen: 'mode', topicKey: key }, function () { openModePicker(key); });
       });
     });
     document.getElementById('statsBtn').addEventListener('click', function () {
       goTo({ screen: 'stats' }, renderStats);
     });
+  }
+
+  var RANDOM_KEY = '__RANDOM40__';
+  var RANDOM_COUNT = 40;
+
+  function randomCardHTML() {
+    return '' +
+      '<div class="topic-card random-card" data-key="' + RANDOM_KEY + '">' +
+        '<div class="topic-main">' +
+          '<div class="topic-name">🎲 Випадкові ' + RANDOM_COUNT + ' питань</div>' +
+          '<div class="topic-meta"><span class="mastery-pill">мікс різних тем</span></div>' +
+        '</div>' +
+        '<div class="topic-count">' + RANDOM_COUNT + '</div>' +
+      '</div>';
   }
 
   function topicCardHTML(key, label, stats) {
@@ -275,7 +296,8 @@
       score: 0,
       answered: false,
       topicLabel: label,
-      missedThisRun: []
+      missedThisRun: [],
+      viewsByIdx: {}
     };
     renderQuestion();
   }
@@ -292,15 +314,16 @@
 
   function renderQuestion() {
     var q = session.list[session.idx];
-    var view = currentQuestionView(q);
+    var saved = session.viewsByIdx[session.idx];
+    var view = saved ? saved.view : currentQuestionView(q);
     session.currentView = view;
-    session.answered = false;
+    session.answered = !!saved;
 
     var total = session.list.length;
     var pct = Math.round((session.idx / total) * 100);
 
     var html = '';
-    html += '<div class="plate"><div><h1>' + esc(session.topicLabel) + '</h1><div class="sub">Питання ' + (session.idx + 1) + ' з ' + total + '</div></div><button class="homebtn" id="quitBtn" style="text-decoration:none;">← Назад</button></div>';
+    html += '<div class="plate"><div><h1>' + esc(session.topicLabel) + '</h1><div class="sub">Питання ' + (session.idx + 1) + ' з ' + total + '</div></div><button class="homebtn" id="quitBtn" style="text-decoration:none;">← Вийти</button></div>';
 
     html += '<div class="quiz-header">' +
       '<span class="progress-label">' + (session.idx + 1) + '/' + total + '</span>' +
@@ -330,12 +353,19 @@
     html += '</div>';
     html += '</div>';
 
-    html += '<div class="nextbar"><button class="btn btn-ghost btn-back" id="backBtn2" type="button">← Назад</button><button class="btn btn-primary btn-next" id="nextBtn" disabled>Далі →</button></div>';
+    html += '<div class="nextbar">' +
+      (session.idx > 0 ? '<button class="btn btn-ghost btn-back" id="backBtn2" type="button">← Назад</button>' : '') +
+      '<button class="btn btn-primary btn-next" id="nextBtn"' + (saved ? '' : ' disabled') + '>Далі →</button>' +
+    '</div>';
 
     app.innerHTML = '<div class="screen">' + html + '</div>';
 
     document.getElementById('quitBtn').addEventListener('click', function () { history.back(); });
-    document.getElementById('backBtn2').addEventListener('click', function () { history.back(); });
+    var backBtn2 = document.getElementById('backBtn2');
+    if (backBtn2) backBtn2.addEventListener('click', function () {
+      session.idx--;
+      renderQuestion();
+    });
     document.querySelectorAll('#optsWrap .opt').forEach(function (btn) {
       btn.addEventListener('click', function () { onAnswer(parseInt(btn.getAttribute('data-pos'), 10)); });
     });
@@ -356,6 +386,15 @@
       btn.textContent = errFlagged ? '⚠️ Позначено як помилка' : '⚠️ Тут помилка?';
       btn.classList.toggle('active', errFlagged);
     });
+
+    if (saved) {
+      lockOptions(view, saved.chosenPos, saved.correct);
+      if (!saved.correct) {
+        var wrap0 = document.getElementById('explWrap');
+        wrap0.innerHTML = explanationHTML(q);
+        wrap0.dataset.open = '1';
+      }
+    }
   }
 
   function explanationHTML(q) {
@@ -382,6 +421,24 @@
     }
   }
 
+  function lockOptions(view, chosenPos, correct) {
+    var buttons = document.querySelectorAll('#optsWrap .opt');
+    buttons.forEach(function (btn, i) {
+      btn.classList.add('locked');
+      if (i === view.correctPos) btn.classList.add('correct');
+      else if (i === chosenPos) btn.classList.add('wrong');
+      else btn.classList.add('dim');
+    });
+    var fb = document.getElementById('feedback');
+    if (correct) {
+      fb.textContent = 'Правильно!';
+      fb.className = 'feedback good';
+    } else {
+      fb.textContent = 'Неправильно. Правильна відповідь виділена зеленим.';
+      fb.className = 'feedback bad';
+    }
+  }
+
   function onAnswer(pos) {
     if (session.answered) return;
     session.answered = true;
@@ -393,22 +450,11 @@
     else session.missedThisRun.push(q);
 
     recordAnswer(q.num, correct);
+    session.viewsByIdx[session.idx] = { view: view, chosenPos: pos, correct: correct };
 
-    var buttons = document.querySelectorAll('#optsWrap .opt');
-    buttons.forEach(function (btn, i) {
-      btn.classList.add('locked');
-      if (i === view.correctPos) btn.classList.add('correct');
-      else if (i === pos) btn.classList.add('wrong');
-      else btn.classList.add('dim');
-    });
+    lockOptions(view, pos, correct);
 
-    var fb = document.getElementById('feedback');
-    if (correct) {
-      fb.textContent = 'Правильно!';
-      fb.className = 'feedback good';
-    } else {
-      fb.textContent = 'Неправильно. Правильна відповідь виділена зеленим.';
-      fb.className = 'feedback bad';
+    if (!correct) {
       var wrap = document.getElementById('explWrap');
       wrap.innerHTML = explanationHTML(q);
       wrap.dataset.open = '1';
@@ -532,17 +578,57 @@
     }
 
     html += '<div class="intro">Деталі по кожній темі:</div>';
-    html += '<div class="stats-table-wrap"><table class="stats-table"><thead><tr>' +
-      '<th>Тема</th><th>Пройдено</th><th>Правильно</th><th>Засвоєно</th><th>🔖</th>' +
-      '</tr></thead><tbody>';
-    topicRows.forEach(function (r) {
-      var s = r.stats;
-      html += '<tr><td>' + esc(r.name) + '</td><td>' + s.seen + '/' + s.total + '</td><td>' + s.passed + '</td><td>' + s.mastered + '</td><td>' + (s.flagged || '') + '</td></tr>';
-    });
-    html += '</tbody></table></div>';
+    html += donutSectionHTML(topicRows, overall);
 
     app.innerHTML = '<div class="screen">' + html + '</div>';
     document.getElementById('backBtn').addEventListener('click', function () { history.back(); });
+  }
+
+  function topicColor(i, n) {
+    var hue = Math.round((i * 137.508) % 360); // golden-angle spacing, distinct even for many slices
+    return 'hsl(' + hue + ', 62%, 56%)';
+  }
+
+  function donutSectionHTML(topicRows, overall) {
+    var r = 45, cx = 60, cy = 60, sw = 20;
+    var circumference = 2 * Math.PI * r;
+    var total = overall.total || 1;
+    var offsetAcc = 0;
+    var segs = '';
+    topicRows.forEach(function (row, i) {
+      var frac = row.stats.total / total;
+      var len = frac * circumference;
+      var color = topicColor(i, topicRows.length);
+      var gap = Math.max(circumference - len, 0);
+      segs += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="' + color + '" ' +
+        'stroke-width="' + sw + '" stroke-dasharray="' + len.toFixed(2) + ' ' + gap.toFixed(2) + '" ' +
+        'stroke-dashoffset="' + (-offsetAcc).toFixed(2) + '"></circle>';
+      offsetAcc += len;
+    });
+    var pct = overall.total > 0 ? Math.round((overall.seen / overall.total) * 100) : 0;
+    var svg = '<svg viewBox="0 0 120 120" class="donut-svg" role="img" aria-label="Розподіл питань за темами">' +
+      '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="var(--asphalt-3)" stroke-width="' + sw + '"></circle>' +
+      '<g transform="rotate(-90 ' + cx + ' ' + cy + ')">' + segs + '</g>' +
+      '<text x="' + cx + '" y="' + (cy - 4) + '" text-anchor="middle" class="donut-center-num">' + pct + '%</text>' +
+      '<text x="' + cx + '" y="' + (cy + 14) + '" text-anchor="middle" class="donut-center-label">пройдено</text>' +
+    '</svg>';
+
+    var legend = '<div class="donut-legend">';
+    topicRows.forEach(function (row, i) {
+      var s = row.stats;
+      var color = topicColor(i, topicRows.length);
+      legend += '<div class="legend-row">' +
+        '<span class="legend-dot" style="background:' + color + '"></span>' +
+        '<span class="legend-name">' + esc(row.name) + '</span>' +
+        '<span class="legend-nums">' + s.seen + '/' + s.total + ' · ✓' + s.passed +
+          (s.mastered > 0 ? ' · 🏆' + s.mastered : '') +
+          (s.flagged > 0 ? ' · 🔖' + s.flagged : '') +
+        '</span>' +
+      '</div>';
+    });
+    legend += '</div>';
+
+    return '<div class="donut-wrap"><div class="donut-chart">' + svg + '</div>' + legend + '</div>';
   }
 
   // ---------------- Bootstrap ----------------

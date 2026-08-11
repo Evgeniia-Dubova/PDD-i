@@ -138,6 +138,10 @@
     border-left-color: var(--line-yellow);
     background: linear-gradient(90deg, rgba(255,201,60,0.10), var(--asphalt-2) 70%);
   }
+  .topic-card.random-card{
+    border-left-color: #8e3b7c;
+    background: linear-gradient(90deg, rgba(142,59,124,0.10), var(--asphalt-2) 70%);
+  }
   .topic-main{ display:flex; flex-direction:column; gap:4px; min-width:0; }
   .topic-name{ font-weight:700; font-size:0.98rem; }
   .topic-meta{ font-size:0.78rem; color:var(--grey); display:flex; gap:8px; align-items:center; flex-wrap:wrap;}
@@ -463,31 +467,78 @@
   .err-item{ border-left-color: var(--bad); }
   .err-item .mnum{ color: var(--bad); }
 
-  .stats-table-wrap{
-    overflow-x: auto;
+  .donut-wrap{
     background: var(--asphalt-2);
     border: 1px solid #f6c9dc;
     border-radius: var(--radius);
+    padding: 18px 16px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:16px;
   }
-  .stats-table{
+  .donut-chart{
+    width:180px;
+    max-width:60%;
+    flex:0 0 auto;
+  }
+  .donut-svg{
     width:100%;
-    border-collapse: collapse;
-    font-size:0.82rem;
+    height:auto;
+    display:block;
   }
-  .stats-table th, .stats-table td{
-    text-align:left;
-    padding: 8px 10px;
-    white-space:nowrap;
+  .donut-svg circle{
+    transition: stroke-dasharray 0.3s ease;
   }
-  .stats-table th{
-    color: var(--grey);
-    font-size:0.72rem;
-    text-transform:uppercase;
+  .donut-center-num{
+    font-family:'Courier New', monospace;
+    font-weight:800;
+    font-size:20px;
+    fill: var(--white);
+  }
+  .donut-center-label{
+    font-size:8px;
+    font-weight:700;
     letter-spacing:0.04em;
+    text-transform:uppercase;
+    fill: var(--grey);
+  }
+  .donut-legend{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    width:100%;
+  }
+  .legend-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:0.82rem;
+    padding: 4px 0;
     border-bottom: 1px solid #f6c9dc;
   }
-  .stats-table tbody tr:nth-child(even){
-    background: rgba(224,85,138,0.05);
+  .legend-row:last-child{ border-bottom:none; }
+  .legend-dot{
+    flex:0 0 12px;
+    width:12px;
+    height:12px;
+    border-radius:50%;
+  }
+  .legend-name{
+    flex:1 1 auto;
+    font-weight:700;
+    min-width:0;
+  }
+  .legend-nums{
+    flex:0 0 auto;
+    font-family:'Courier New', monospace;
+    font-size:0.76rem;
+    color: var(--grey);
+    white-space:nowrap;
+  }
+  @media (min-width:520px){
+    .donut-wrap{ flex-direction:row; align-items:flex-start; }
+    .donut-chart{ width:200px; }
   }
 
   footer{
