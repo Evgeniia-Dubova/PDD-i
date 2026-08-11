@@ -105,6 +105,7 @@
   }
   .overall-num.good{ color: var(--good); }
   .overall-num.mastered{ color: #8e3b7c; }
+  .overall-num.err{ color: var(--bad); }
   .overall-sub{ font-size:0.76rem; font-weight:600; color: var(--grey); }
   .mastered-fill{ background: #8e3b7c; }
   .intro{
@@ -159,6 +160,9 @@
   }
   .flag-count{
     font-size:0.72rem; color: var(--line-yellow-dim); font-weight:700;
+  }
+  .errflag-count{
+    font-size:0.72rem; color: var(--bad); font-weight:700;
   }
   .btn-stats{
     align-self:flex-start;
@@ -215,12 +219,37 @@
     flex-direction:column;
     gap:14px;
   }
+  .qcard-top{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+  }
   .qnum{
     font-family:'Courier New', monospace;
     color: var(--line-yellow-dim);
     font-size:0.78rem;
     font-weight:700;
     letter-spacing:0.04em;
+  }
+  .btn-errflag{
+    flex:0 0 auto;
+    background:transparent;
+    border:1.5px solid #f2b8d1;
+    color: var(--grey);
+    border-radius:20px;
+    padding:5px 11px;
+    font-size:0.72rem;
+    font-weight:700;
+    cursor:pointer;
+    white-space:nowrap;
+    transition: border-color 0.12s ease, background 0.12s ease, color 0.12s ease;
+  }
+  .btn-errflag:hover{ border-color: var(--bad); color: var(--bad); }
+  .btn-errflag.active{
+    background: var(--bad-bg);
+    border-color: var(--bad);
+    color: var(--bad);
   }
   .qtext{
     font-size:1.08rem;
@@ -362,7 +391,7 @@
   }
 
   .nextbar{
-    display:flex; justify-content:flex-end;
+    display:flex; align-items:stretch; gap:10px;
   }
   .btn{
     border:none;
@@ -372,6 +401,15 @@
     font-size:0.92rem;
     cursor:pointer;
     letter-spacing:0.02em;
+  }
+  .btn-back{
+    flex:0 0 auto;
+    border-radius:10px;
+  }
+  .btn-next{
+    flex:1 1 auto;
+    padding: 15px 20px;
+    font-size:1rem;
   }
   .btn-primary{
     background: var(--line-yellow);
@@ -422,6 +460,8 @@
   }
   .missed-item .mnum{ color:var(--line-yellow-dim); font-weight:700; font-family:'Courier New', monospace; font-size:0.75rem;}
   .missed-item .manswer{ color:var(--good); font-weight:600; margin-top:3px;}
+  .err-item{ border-left-color: var(--bad); }
+  .err-item .mnum{ color: var(--bad); }
 
   .stats-table-wrap{
     overflow-x: auto;

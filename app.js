@@ -30,10 +30,10 @@
   function saveProgress(p) {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(p)); } catch (e) {}
   }
-  var progress = loadProgress(); // { [num]: {seen:int, correctStreak:int, lastCorrect:bool, flagged:bool} }
+  var progress = loadProgress(); // { [num]: {seen:int, correctStreak:int, lastCorrect:bool, flagged:bool, errorFlagged:bool} }
 
   function recordAnswer(num, correct) {
-    var e = progress[num] || { seen: 0, correctStreak: 0, lastCorrect: null, flagged: false };
+    var e = progress[num] || { seen: 0, correctStreak: 0, lastCorrect: null, flagged: false, errorFlagged: false };
     e.seen += 1;
     e.lastCorrect = correct;
     e.correctStreak = correct ? (e.correctStreak + 1) : 0;
@@ -42,11 +42,19 @@
   }
 
   function toggleFlag(num) {
-    var e = progress[num] || { seen: 0, correctStreak: 0, lastCorrect: null, flagged: false };
+    var e = progress[num] || { seen: 0, correctStreak: 0, lastCorrect: null, flagged: false, errorFlagged: false };
     e.flagged = !e.flagged;
     progress[num] = e;
     saveProgress(progress);
     return e.flagged;
+  }
+
+  function toggleErrorFlag(num) {
+    var e = progress[num] || { seen: 0, correctStreak: 0, lastCorrect: null, flagged: false, errorFlagged: false };
+    e.errorFlagged = !e.errorFlagged;
+    progress[num] = e;
+    saveProgress(progress);
+    return e.errorFlagged;
   }
 
   function isPassed(num) {
@@ -71,18 +79,23 @@
     var e = progress[num];
     return !!(e && e.flagged);
   }
+  function isErrorFlagged(num) {
+    var e = progress[num];
+    return !!(e && e.errorFlagged);
+  }
 
   function topicStats(topicKey) {
     var list = topicKey === '__ALL__' ? QUESTIONS : byTopic[topicKey];
-    var passed = 0, missed = 0, seen = 0, mastered = 0, flagged = 0;
+    var passed = 0, missed = 0, seen = 0, mastered = 0, flagged = 0, errorFlagged = 0;
     list.forEach(function (q) {
       if (isSeen(q.num)) seen++;
       if (isPassed(q.num)) passed++;
       else if (isMissed(q.num)) missed++;
       if (isMastered(q.num)) mastered++;
       if (isFlagged(q.num)) flagged++;
+      if (isErrorFlagged(q.num)) errorFlagged++;
     });
-    return { total: list.length, passed: passed, missed: missed, seen: seen, mastered: mastered, flagged: flagged };
+    return { total: list.length, passed: passed, missed: missed, seen: seen, mastered: mastered, flagged: flagged, errorFlagged: errorFlagged };
   }
 
   // ---------------- Rendering ----------------
@@ -185,6 +198,7 @@
     metaBits.push('<span class="' + masteredPillCls + '">' + stats.mastered + '/' + stats.total + ' засвоєно</span>');
     if (stats.missed > 0) metaBits.push('<span class="miss-count">' + stats.missed + ' зі помилками</span>');
     if (stats.flagged > 0) metaBits.push('<span class="flag-count">🔖 ' + stats.flagged + '</span>');
+    if (stats.errorFlagged > 0) metaBits.push('<span class="errflag-count">⚠️ ' + stats.errorFlagged + '</span>');
     return '' +
       '<div class="' + cls + '" data-key="' + esc(key) + '">' +
         '<div class="topic-main">' +
@@ -201,6 +215,7 @@
     var unseenList = list.filter(function (q) { return !isSeen(q.num); });
     var missedList = list.filter(function (q) { return isMissed(q.num); });
     var flaggedList = list.filter(function (q) { return isFlagged(q.num); });
+    var errorList = list.filter(function (q) { return isErrorFlagged(q.num); });
     var stats = topicStats(topicKey);
 
     var html = '';
@@ -222,6 +237,9 @@
     if (flaggedList.length > 0) {
       html += modeCardHTML('flagged', '🔖 На повторення', flaggedList.length + ' питань, позначених вручну');
     }
+    if (errorList.length > 0) {
+      html += modeCardHTML('errors', '⚠️ Позначені як помилка', errorList.length + ' питань, де ви позначили можливу помилку в даних');
+    }
     html += modeCardHTML('all', 'Пройти всю тему', list.length + ' питань, у випадковому порядку (з повторами)');
     html += '</div>';
     app.innerHTML = '<div class="screen">' + html + '</div>';
@@ -234,6 +252,7 @@
         if (mode === 'missed') pool = missedList;
         else if (mode === 'new') pool = unseenList;
         else if (mode === 'flagged') pool = flaggedList;
+        else if (mode === 'errors') pool = errorList;
         goTo({ screen: 'quiz', topicKey: topicKey, label: label }, function () { startSession(pool, label); });
       });
     });
@@ -290,7 +309,10 @@
     '</div>';
 
     html += '<div class="qcard">';
+    html += '<div class="qcard-top">';
     html += '<div class="qnum">Питання № ' + q.num + '</div>';
+    html += '<button class="btn-errflag' + (isErrorFlagged(q.num) ? ' active' : '') + '" id="errFlagBtn" type="button">' + (isErrorFlagged(q.num) ? '⚠️ Позначено як помилка' : '⚠️ Тут помилка?') + '</button>';
+    html += '</div>';
     html += '<div class="qtext">' + esc(q.text) + '</div>';
     if (q.img) {
       html += '<div class="qimg-wrap"><img src="assets/img/' + q.img + '" alt="Зображення до питання"></div>';
@@ -308,11 +330,12 @@
     html += '</div>';
     html += '</div>';
 
-    html += '<div class="nextbar"><button class="btn btn-primary" id="nextBtn" disabled>Далі →</button></div>';
+    html += '<div class="nextbar"><button class="btn btn-ghost btn-back" id="backBtn2" type="button">← Назад</button><button class="btn btn-primary btn-next" id="nextBtn" disabled>Далі →</button></div>';
 
     app.innerHTML = '<div class="screen">' + html + '</div>';
 
     document.getElementById('quitBtn').addEventListener('click', function () { history.back(); });
+    document.getElementById('backBtn2').addEventListener('click', function () { history.back(); });
     document.querySelectorAll('#optsWrap .opt').forEach(function (btn) {
       btn.addEventListener('click', function () { onAnswer(parseInt(btn.getAttribute('data-pos'), 10)); });
     });
@@ -326,6 +349,12 @@
       var btn = document.getElementById('flagBtn');
       btn.textContent = flagged ? '✅ У списку повторення' : '🔖 Повторити пізніше';
       btn.classList.toggle('active', flagged);
+    });
+    document.getElementById('errFlagBtn').addEventListener('click', function () {
+      var errFlagged = toggleErrorFlag(q.num);
+      var btn = document.getElementById('errFlagBtn');
+      btn.textContent = errFlagged ? '⚠️ Позначено як помилка' : '⚠️ Тут помилка?';
+      btn.classList.toggle('active', errFlagged);
     });
   }
 
@@ -464,7 +493,18 @@
       '<div class="overall-row overall-sub"><span>Точність відповідей</span><span class="overall-num good">' + accuracyPct + '%</span></div>' +
       '<div class="overall-row overall-sub"><span>Засвоєно (3× поспіль)</span><span class="overall-num mastered">' + overall.mastered + '</span></div>' +
       '<div class="overall-row overall-sub"><span>Позначено на повторення</span><span class="overall-num">🔖 ' + overall.flagged + '</span></div>' +
+      '<div class="overall-row overall-sub"><span>Позначено як помилка</span><span class="overall-num err">⚠️ ' + overall.errorFlagged + '</span></div>' +
     '</div>';
+
+    var errorQuestions = QUESTIONS.filter(function (q) { return isErrorFlagged(q.num); });
+    if (errorQuestions.length > 0) {
+      html += '<div class="intro">Питання, позначені як можлива помилка (' + errorQuestions.length + '):</div>';
+      html += '<div class="missed-list">';
+      errorQuestions.forEach(function (q) {
+        html += '<div class="missed-item err-item"><div class="mnum">№ ' + q.num + ' · ' + esc(q.topic) + '</div>' + esc(q.text) + '</div>';
+      });
+      html += '</div>';
+    }
 
     var topicRows = TOPIC_ORDER.map(function (t) {
       return { name: t, stats: topicStats(t) };
