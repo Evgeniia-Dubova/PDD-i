@@ -196,6 +196,47 @@
     border-color: var(--line-yellow);
   }
 
+  /* ---------- Access gate ---------- */
+  .lock-card{
+    background: var(--asphalt-2);
+    border-radius: var(--radius);
+    border:1px solid #f6c9dc;
+    padding: 26px 20px;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+    align-items:stretch;
+  }
+  .lock-title{
+    font-size:0.95rem;
+    font-weight:700;
+    color: var(--white);
+    text-align:center;
+  }
+  .lock-input{
+    border: 1.5px solid #f2b8d1;
+    border-radius:10px;
+    padding: 12px 14px;
+    font-size:1rem;
+    background:#fff;
+    color: var(--white);
+  }
+  .lock-input:focus{
+    outline:none;
+    border-color: var(--line-yellow-dim);
+  }
+  .lock-btn{
+    width:100%;
+    padding: 13px 20px;
+  }
+  .lock-error{
+    min-height:1.2em;
+    color: var(--bad);
+    font-size:0.85rem;
+    font-weight:700;
+    text-align:center;
+  }
+
   /* ---------- Quiz screen ---------- */
   .quiz-header{
     display:flex; align-items:center; gap:12px;

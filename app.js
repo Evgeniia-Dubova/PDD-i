@@ -118,6 +118,54 @@
     return d.innerHTML;
   }
 
+  // ---------------- Access gate ----------------
+  // Simple shared-password lock. Once a device enters the correct password,
+  // it's remembered in localStorage (separate key from quiz progress, so
+  // progress is never touched) and the password is never asked again on
+  // that device — even if the password below is changed later. Changing
+  // SITE_PASSWORD only affects devices that haven't unlocked yet, so an old
+  // password forwarded to someone new will stop working once it's changed.
+  var AUTH_KEY = 'pdd_unlocked_v1';
+  var SITE_PASSWORD = 'Ireland2026Road!';
+
+  function isUnlocked() {
+    try { return localStorage.getItem(AUTH_KEY) === '1'; } catch (e) { return false; }
+  }
+  function setUnlocked() {
+    try { localStorage.setItem(AUTH_KEY, '1'); } catch (e) {}
+  }
+
+  function renderLockScreen() {
+    var appEl = document.getElementById('app');
+    appEl.innerHTML =
+      '<div class="plate"><div><h1>ПДД Ірландії</h1><div class="sub">Доступ обмежено</div></div></div>' +
+      '<div class="lock-card">' +
+        '<div class="lock-title">Введіть пароль для доступу до тренажера</div>' +
+        '<input type="password" id="lockInput" class="lock-input" placeholder="Пароль" autocomplete="off">' +
+        '<button class="btn btn-primary lock-btn" id="lockBtn" type="button">Увійти</button>' +
+        '<div class="lock-error" id="lockError"></div>' +
+      '</div>';
+
+    function tryUnlock() {
+      var val = document.getElementById('lockInput').value;
+      if (val === SITE_PASSWORD) {
+        setUnlocked();
+        history.replaceState({ screen: 'menu' }, '');
+        renderMenu();
+      } else {
+        document.getElementById('lockError').textContent = 'Неправильний пароль';
+        document.getElementById('lockInput').value = '';
+        document.getElementById('lockInput').focus();
+      }
+    }
+
+    document.getElementById('lockBtn').addEventListener('click', tryUnlock);
+    document.getElementById('lockInput').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') tryUnlock();
+    });
+    document.getElementById('lockInput').focus();
+  }
+
   // ---------------- Navigation (History API) ----------------
   // Every screen transition initiated by a click pushes a history entry.
   // Browser/device back button (and an in-app "← Назад" button that just
@@ -632,6 +680,10 @@
   }
 
   // ---------------- Bootstrap ----------------
-  history.replaceState({ screen: 'menu' }, '');
-  renderMenu();
+  if (isUnlocked()) {
+    history.replaceState({ screen: 'menu' }, '');
+    renderMenu();
+  } else {
+    renderLockScreen();
+  }
 })();
