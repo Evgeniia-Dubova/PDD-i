@@ -126,7 +126,7 @@
   // SITE_PASSWORD only affects devices that haven't unlocked yet, so an old
   // password forwarded to someone new will stop working once it's changed.
   var AUTH_KEY = 'pdd_unlocked_v1';
-  var SITE_PASSWORD = 'Ireland2026Road!';
+  var SITE_PASSWORD = 'Kv9!rTz2@Lm7#Qx4';
 
   function isUnlocked() {
     try { return localStorage.getItem(AUTH_KEY) === '1'; } catch (e) { return false; }
